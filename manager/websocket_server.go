@@ -1,0 +1,151 @@
+package manager
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"sync"
+
+	"github.com/gorilla/websocket"
+)
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+type ServRequest struct {
+	Type    string            `json:"type"`
+	To      string            `json:"to"`
+	From    string            `json:"from"`
+	Token   string            `json:"token"`
+	Payload map[string]string `json:"payload"`
+}
+
+type WSMiddleware interface {
+	Process(*ServRequest, *Manager, *websocket.Conn) error
+}
+
+type HTTPMiddleware interface {
+	Process(*ServRequest, *http.Request, http.ResponseWriter, *Manager) error
+}
+
+type WSHandler struct {
+	wsMiddlewares   []WSMiddleware
+	httpMiddlewares []HTTPMiddleware
+	manager         *Manager
+}
+
+type WSServ struct {
+	Server *http.Server
+}
+
+func NewWSServ(addr string, handler http.Handler) (wsServ *WSServ) {
+	s := &http.Server{
+		Addr:    addr,
+		Handler: handler,
+	}
+	wsServ = &WSServ{
+		Server: s,
+	}
+	return
+}
+
+func NewWSHandler(manager *Manager, wsMiddlewares []WSMiddleware, httpMiddlewares []HTTPMiddleware) (wsHandler *WSHandler) {
+	wsHandler = &WSHandler{
+		wsMiddlewares:   wsMiddlewares,
+		httpMiddlewares: httpMiddlewares,
+		manager:         manager,
+	}
+	return
+}
+
+func (wsh *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	done, errCh := make(chan struct{}), make(chan error)
+	var peerId string
+	go func() {
+		switch req.URL.Path {
+		case "/ws":
+			conn, err := upgrader.Upgrade(w, req, nil)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			defer conn.Close()
+			for {
+				_, message, err := conn.ReadMessage()
+				if err != nil {
+					errCh <- err
+					conn.Close()
+					break
+				}
+				fmt.Printf("received message %s\n", string(message))
+				go func(msg []byte) {
+					var req ServRequest
+					if err := json.Unmarshal(msg, &req); err != nil {
+						log.Println(err)
+						return
+					}
+					if req.Type == WS_INIT {
+						peerId = req.From
+					}
+					//wg := &sync.WaitGroup{}
+					fmt.Println("my cool request", req)
+					for _, middleware := range wsh.wsMiddlewares {
+						if err := middleware.Process(&req, wsh.manager, conn); err != nil {
+							log.Println(err)
+							return
+						}
+					}
+				}(message)
+			}
+		case "/req":
+			fmt.Println("got req", req.Body)
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			var r ServRequest
+			if err := json.Unmarshal(body, &r); err != nil {
+				log.Println(err)
+				return
+			}
+			wg := &sync.WaitGroup{}
+			for _, httpMiddleware := range wsh.httpMiddlewares {
+				wg.Add(1)
+				go func(hm HTTPMiddleware) {
+					if err := hm.Process(&r, req, w, wsh.manager); err != nil {
+						log.Println(err)
+					}
+					wg.Done()
+				}(httpMiddleware)
+			}
+			wg.Wait()
+		default:
+			if _, err := os.Stat("./app/" + req.URL.Path); os.IsNotExist(err) {
+				http.ServeFile(w, req, "./app/index.html")
+			} else {
+				http.ServeFile(w, req, "./app/"+req.URL.Path)
+			}
+		}
+		done <- struct{}{}
+	}()
+	select {
+	case <-req.Context().Done():
+		log.Println(req.Context().Err())
+		delete(wsh.manager.WSPeers, peerId)
+		return
+	case <-done:
+		return
+	case err := <-errCh:
+		log.Println(err)
+		delete(wsh.manager.WSPeers, peerId)
+		return
+	}
+}

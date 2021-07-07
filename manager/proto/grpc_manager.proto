@@ -1,0 +1,143 @@
+syntax = "proto3";
+package manager;
+option go_package=".;manager";
+
+message Request {
+    string type = 1;
+    string from = 2;
+    string token = 3;
+    map<string,string> payload = 4;
+}
+
+message PeerRegisterRequest {
+    string peerId = 1;
+    string peerKey = 2;
+    string peerUsername = 3;
+}
+
+message PeerRegisterResponse {
+    bool success = 1;
+    string log = 2;
+}
+
+message PeerListRequest {
+    int32 number = 1;
+    int32 lastIndex = 2;
+    string name = 3;
+    map<string,string> filters = 4;
+}
+
+message SquadConnectRequest {
+    string id = 1;
+    string userId = 2;
+    string password = 3;
+}
+
+message ProtoSquad {
+    string id = 1;
+    string name = 2;
+    repeated string members = 3;
+    string squadType = 4;
+    string owner = 5;
+    string host = 6;
+}
+
+message SquadCreateRequest {
+    string userId = 1;
+    string name = 2;
+    string squadType = 3;
+    string password = 4;
+}   
+
+message SquadListRequest {
+    int32 number = 1;
+    int32 lastIndex = 2;
+    string name = 3;
+    map<string,string> filters = 4;
+}
+
+message SquadUpdateRequest {
+    string userId = 1;
+    string id = 5;
+    string name = 2;
+    string squadType = 3;
+    string password = 4;
+}
+
+message SquadDeleteRequest {
+    string userId = 1;
+    string squadId = 2;
+}
+
+message Peer {
+    string id = 1;
+    string name = 2;
+    string pubKey = 3;
+    bool active = 4;
+}
+
+message PeerListResponse {
+    bool success = 1;
+    int32 lastIndex = 2;
+    repeated Peer peers = 3;
+}
+
+message SquadConnectResponse {
+    bool success = 1;
+    string reason = 2;
+    string id = 3;
+    repeated string members = 4;
+}
+
+message SquadLeaveRequest {
+    string userId = 1;
+    string squadId = 2;
+}
+
+message SquadCreateResponse {
+    bool success = 1;
+    string reason = 2;
+    ProtoSquad squad = 3;
+}
+
+message SquadListResponse {
+    bool success = 1;
+    int32 lastIndex = 2;
+    repeated ProtoSquad squads = 3;
+}
+
+message SquadUpdateResponse {
+    bool success = 1;
+    string reason = 2;
+    ProtoSquad squad = 3;
+}
+
+message SquadDeleteResponse {
+    bool succes = 1;
+    string reason = 2;
+    ProtoSquad squad = 3;
+}
+
+message SquadLeaveResponse {
+    bool success = 1;
+    string reason = 2;
+    string squadId = 3;
+}
+
+message Response {
+    string type = 1;
+    bool success = 2;
+    map<string,string> payload = 3;
+}
+
+service GrpcManager {
+    rpc Link(stream Request) returns (stream Response);
+    rpc RegisterPeer (PeerRegisterRequest) returns (PeerRegisterResponse);
+    rpc ListPeers(PeerListRequest) returns (PeerListResponse);
+    rpc CreateSquad (SquadCreateRequest) returns (SquadCreateResponse);
+    rpc UpdateSquad (SquadUpdateRequest) returns (SquadUpdateResponse);
+    rpc DeleteSquad (SquadDeleteRequest) returns (SquadDeleteResponse);
+    rpc ListSquad (SquadListRequest) returns (SquadListResponse);
+    rpc ConnectSquad (SquadConnectRequest) returns (SquadConnectResponse);
+    rpc LeaveSquad (SquadLeaveRequest) returns (SquadLeaveResponse);
+}
