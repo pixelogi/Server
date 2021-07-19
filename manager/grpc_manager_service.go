@@ -27,6 +27,7 @@ func NewGRPCManagerService(manager *Manager) (service *GRPCManagerService) {
 
 func (service *GRPCManagerService) Link(stream GrpcManager_LinkServer) (err error) {
 	done, errch := make(chan struct{}), make(chan error)
+	fmt.Println("link init")
 	go func() {
 		req, err := stream.Recv()
 		if err != nil {
@@ -109,7 +110,7 @@ func (service *GRPCManagerService) CreateSquad(ctx context.Context, req *SquadCr
 			errch <- uidErr
 			return
 		}
-		if err := service.Manager.CreateSquad(uid.String(), req.UserId, req.Name, SquadType(req.SquadType), req.Password, "mesh", "lolo_local_serv"); err != nil {
+		if err := service.Manager.CreateSquad(req.Token, uid.String(), req.UserId, req.Name, SquadType(req.SquadType), req.Password, "mesh", "lolo_local_serv"); err != nil {
 			errch <- err
 			return
 		}
@@ -138,7 +139,7 @@ func (service *GRPCManagerService) CreateSquad(ctx context.Context, req *SquadCr
 func (service *GRPCManagerService) UpdateSquad(ctx context.Context, req *SquadUpdateRequest) (res *SquadUpdateResponse, err error) {
 	done, errch := make(chan *SquadUpdateResponse), make(chan error)
 	go func() {
-		if err := service.Manager.ModifySquad(req.Id, req.UserId, req.Name, SquadType(req.SquadType), req.Password); err != nil {
+		if err := service.Manager.ModifySquad(req.Token, req.Id, req.UserId, req.Name, SquadType(req.SquadType), req.Password); err != nil {
 			errch <- err
 			return
 		}
@@ -168,7 +169,7 @@ func (service *GRPCManagerService) UpdateSquad(ctx context.Context, req *SquadUp
 func (service *GRPCManagerService) DeleteSquad(ctx context.Context, req *SquadDeleteRequest) (res *SquadDeleteResponse, err error) {
 	done, errch := make(chan *SquadDeleteResponse), make(chan error)
 	go func() {
-		if err := service.Manager.DeleteSquad(req.SquadId, req.UserId); err != nil {
+		if err := service.Manager.DeleteSquad(req.Token, req.SquadId, req.UserId); err != nil {
 			errch <- err
 			return
 		}
@@ -227,7 +228,7 @@ func (service *GRPCManagerService) ListSquad(ctx context.Context, req *SquadList
 func (service *GRPCManagerService) ConnectSquad(ctx context.Context, req *SquadConnectRequest) (res *SquadConnectResponse, err error) {
 	done, errch := make(chan *SquadConnectResponse), make(chan error)
 	go func() {
-		if err := service.Manager.ConnectToSquad(req.Id, req.UserId, req.Password, true); err != nil {
+		if err := service.Manager.ConnectToSquad(req.Token, req.Id, req.UserId, req.Password, ""); err != nil {
 			errch <- err
 			return
 		}
@@ -251,7 +252,7 @@ func (service *GRPCManagerService) ConnectSquad(ctx context.Context, req *SquadC
 func (service *GRPCManagerService) LeaveSquad(ctx context.Context, req *SquadLeaveRequest) (res *SquadLeaveResponse, err error) {
 	done, errch := make(chan *SquadLeaveResponse), make(chan error)
 	go func() {
-		if err := service.Manager.LeaveSquad(req.SquadId, req.UserId, true); err != nil {
+		if err := service.Manager.LeaveSquad(req.SquadId, req.UserId, ""); err != nil {
 			errch <- err
 			return
 		}

@@ -25,12 +25,16 @@ message PeerListRequest {
     int32 lastIndex = 2;
     string name = 3;
     map<string,string> filters = 4;
+    string token = 5;
 }
 
 message SquadConnectRequest {
     string id = 1;
     string userId = 2;
     string password = 3;
+    string authType = 4;
+    string networkType = 5;
+    string token = 6;
 }
 
 message ProtoSquad {
@@ -40,6 +44,9 @@ message ProtoSquad {
     string squadType = 4;
     string owner = 5;
     string host = 6;
+    string authType = 7;
+    bool status = 8;
+    repeated string authorizedMembers = 9;
 }
 
 message SquadCreateRequest {
@@ -47,6 +54,7 @@ message SquadCreateRequest {
     string name = 2;
     string squadType = 3;
     string password = 4;
+    string token = 5;
 }   
 
 message SquadListRequest {
@@ -54,19 +62,24 @@ message SquadListRequest {
     int32 lastIndex = 2;
     string name = 3;
     map<string,string> filters = 4;
+    string squadType = 5;
+    string squadNetworkType = 6;
+    string token = 7;
 }
 
 message SquadUpdateRequest {
     string userId = 1;
-    string id = 5;
     string name = 2;
     string squadType = 3;
     string password = 4;
+    string id = 5;
+    string token = 6;
 }
 
 message SquadDeleteRequest {
     string userId = 1;
     string squadId = 2;
+    string token = 3;
 }
 
 message Peer {
@@ -74,6 +87,8 @@ message Peer {
     string name = 2;
     string pubKey = 3;
     bool active = 4;
+    repeated string knownSquadsId = 5;
+    repeated string friends = 6;
 }
 
 message PeerListResponse {
@@ -92,6 +107,7 @@ message SquadConnectResponse {
 message SquadLeaveRequest {
     string userId = 1;
     string squadId = 2;
+    string token = 3;
 }
 
 message SquadCreateResponse {

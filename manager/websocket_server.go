@@ -77,15 +77,16 @@ func (wsh *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 			defer conn.Close()
-			for {
-				_, message, err := conn.ReadMessage()
-				if err != nil {
-					errCh <- err
-					conn.Close()
-					break
-				}
-				fmt.Printf("received message %s\n", string(message))
-				go func(msg []byte) {
+			doneCh, msgCh := make(chan struct{}), make(chan []byte, 100)
+			defer close(doneCh)
+			conn.SetCloseHandler(func(code int, text string) error {
+				close(doneCh)
+				close(msgCh)
+				delete(wsh.manager.WSPeers, peerId)
+				return nil
+			})
+			go func() {
+				for msg := range msgCh {
 					var req ServRequest
 					if err := json.Unmarshal(msg, &req); err != nil {
 						log.Println(err)
@@ -94,7 +95,6 @@ func (wsh *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					if req.Type == WS_INIT {
 						peerId = req.From
 					}
-					//wg := &sync.WaitGroup{}
 					fmt.Println("my cool request", req)
 					for _, middleware := range wsh.wsMiddlewares {
 						if err := middleware.Process(&req, wsh.manager, conn); err != nil {
@@ -102,7 +102,21 @@ func (wsh *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 							return
 						}
 					}
-				}(message)
+				}
+			}()
+			for {
+				_, message, err := conn.ReadMessage()
+				if err != nil {
+					errCh <- err
+					conn.Close()
+					break
+				}
+				fmt.Printf("received message %s\n", string(message))
+				select {
+				case msgCh <- message:
+				case <-done:
+					return
+				}
 			}
 		case "/req":
 			fmt.Println("got req", req.Body)
